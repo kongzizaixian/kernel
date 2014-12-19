@@ -769,4 +769,70 @@
                         hisilicon,consumer-supplies = "mcamera_core";
                 };
 	};
+
+        hisi-ion@0 {
+                compatible = "hisilicon,ion";
+                memreserve_base = <0x1ff00000>;
+                memreserve_size = <0x18d00000>;
+
+                heap_fb@0 {
+                        heap-name = "fb";
+                        heap-range = <0x37300000 0x01900000>;
+                        heap-type = "ion_carveout";
+                };
+
+                heap_vpu@0 {
+                        heap-name = "vpu";
+                        heap-range = <0x34200000 0x03100000>;
+                        heap-type = "ion_carveout";
+                };
+
+                heap_jpu@0 {
+                        heap-name = "jpu";
+                        heap-range = <0x33100000 0x01100000>;
+                        heap-type = "ion_carveout";
+                };
+
+                heap_gralloc@0 {
+                        heap-name = "gralloc-carveout";
+                        heap-range = <0x27b00000 0x0b600000>;
+                        heap-type = "ion_carveout";
+                };
+
+                heap_overlay@0 {
+                        heap-name = "overlay";
+                        heap-range = <0x1ff00000 0x07c00000>;
+                        heap-type = "ion_carveout";
+                };
+
+                heap_sys_user@0 {
+                        heap-name = "sys_user";
+                        heap-range = <0x0 0x0>;
+                        heap-type = "ion_system";
+                };
+
+                heap_sys_contig@0 {
+                        heap-name = "sys_contig";
+                        heap-range = <0x0 0x0>;
+                        heap-type = "ion_system_contig";
+                };
+        };
+
+	mtcmos {
+		compatible = "hisilicon,hi6220-mtcmos-driver";
+		hisilicon,mtcmos-steady-us = <10>;
+		hisilicon,mtcmos-sc-on-base  = <0xf7800000>;
+		hisilicon,mtcmos-acpu-on-base = <0xf65a0000>;
+
+		mtcmos1: regulator@a1{
+			regulator-name = "G3D_PD_VDD";
+			hisilicon,ctrl-regs = <0x830 0x834 0x83c>;
+			hisilicon,ctrl-data = <1 0x1>;
+		};
+		mtcmos2: regulator@a2{
+			regulator-name = "SOC_MED";
+			hisilicon,ctrl-regs = <0x830 0x834 0x83c>;
+			hisilicon,ctrl-data = <2 0x1>;
+		};
+	};
 };
