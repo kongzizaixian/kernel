@@ -218,12 +218,12 @@ static unsigned int hi655x_regulator_pmic_get_optimum_mode(struct regulator_dev 
 	return REGULATOR_MODE_NORMAL;
 }
 
-static hi655x_set_current_limit(struct regulator_dev *rdev)
+static int hi655x_set_current_limit(struct regulator_dev *rdev)
 {
 	return 0;
 }
 
-static hi655x_get_current_limit(struct regulator_dev *rdev)
+static int hi655x_get_current_limit(struct regulator_dev *rdev)
 {
 	return 0;
 }
@@ -421,7 +421,7 @@ static int hi655x_regulator_probe(struct platform_device *pdev)
 	const struct of_device_id *match = NULL;
 	const struct hi655x_regulator *template = NULL;
 	struct regulator_config config = { };
-
+printk(".................regulate...............enter\n ");
 	/* to check which type of regulator this is */
 	match = of_match_device(of_hi655x_regulator_match_tbl, &pdev->dev);
 
@@ -459,7 +459,6 @@ static int hi655x_regulator_probe(struct platform_device *pdev)
 	rdesc = &sreg->rdesc;
 	rdesc->n_voltages = sreg->vol_numb;
 	rdesc->name = initdata->constraints.name;
-	pr_err("probe of regulator name %s\n", rdesc->name);
 	rdesc->id = sreg->regulator_id;
 	rdesc->min_uV = initdata->constraints.min_uV;
 
@@ -479,6 +478,7 @@ static int hi655x_regulator_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, rdev);
 
+printk(".................regulate...............exit\n ");
 	return ret;
 }
 

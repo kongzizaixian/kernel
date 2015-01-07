@@ -225,6 +225,7 @@ static int hi655x_pmic_probe(struct platform_device *pdev)
 	struct device_node *np = dev->of_node;
 	struct hi655x_pmic *pmic = NULL;
 
+printk("pmicppppppppppppppppppppppppppppppppppp\n");
 	/*
 	 * this is new feature in kernel 3.10
 	 */
@@ -338,7 +339,7 @@ static int hi655x_pmic_probe(struct platform_device *pdev)
 	of_platform_populate(np, of_hi655x_pmic_child_match_tbl, NULL, dev);
 
 	dev_stat = hi655x_pmic_version_check();
-
+printk("pmicppppppppppppppcccccccccccc\n");
 	return 0;
 }
 

@@ -181,7 +181,7 @@ static int hi6220_mtcmos_probe(struct platform_device *pdev)
 	struct regulator_config config = { };
 	struct regulator_init_data *init_data;
 	struct hi6220_mtcmos_info *sreg;
-
+printk("mtcmos_probe.......................enter\n");
 	dev = &pdev->dev;
 	np = dev->of_node;
 	mtcmos = devm_kzalloc(dev,
@@ -233,7 +233,7 @@ static int hi6220_mtcmos_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, mtcmos);
-
+printk("mtcmos_probe.......................exit\n");
 	return 0;
 }
 
