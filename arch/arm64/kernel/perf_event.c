@@ -1379,7 +1379,7 @@ static void armv8pmu_stop(void)
 }
 
 static int armv8pmu_get_event_idx(struct pmu_hw_events *cpuc,
-				  struct hw_perf_event *event)
+				struct hw_perf_event *event)
 {
 	int idx;
 	unsigned long evtype = event->config_base & ARMV8_EVTYPE_EVENT;
