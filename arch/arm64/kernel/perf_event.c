@@ -53,6 +53,14 @@ static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
 /* Set at runtime when we know what CPU type we are. */
 static struct arm_pmu *cpu_pmu;
 
+const char *perf_pmu_name(void)
+{
+    if (!cpu_pmu)
+        return NULL;
+    return cpu_pmu->name;
+}
+EXPORT_SYMBOL_GPL(perf_pmu_name);
+
 int
 armpmu_get_max_events(void)
 {
@@ -667,7 +675,7 @@ enum armv8_pmuv3_perf_types {
 	ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL			= 0x03,
 	ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS			= 0x04,
 	ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED			= 0x10,
-	ARMV8_PMUV3_PERFCTR_CLOCK_CYCLES			= 0x11,
+	ARMV8_PMUV3_PERFCTR_CPU_CYCLES	                        = 0x11,
 	ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED			= 0x12,
 
 	/* At least one of the following is required. */
@@ -699,6 +707,7 @@ enum armv8_pmuv3_perf_types {
 	ARMV8_PMUV3_PERFCTR_BUS_ACCESS				= 0x19,
 	ARMV8_PMUV3_PERFCTR_MEM_ERROR				= 0x1A,
 	ARMV8_PMUV3_PERFCTR_BUS_CYCLES				= 0x1D,
+        ARMV8_PMUV3_PERFCTR_CLOCK_CYCLES			= 0XFF,
 };
 
 /* PMUv3 HW events mapping. */
