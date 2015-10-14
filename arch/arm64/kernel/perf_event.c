@@ -212,11 +212,6 @@ armpmu_event_set_period(struct perf_event *event,
 					ARMV8_HISI_IDX_DDR_COUNTER_MAX) {
 		//pr_info("event_set_period for DDR idx=%d\n", idx);
 	}
-
-	armpmu->write_counter(idx, (u64)(-left) & 0xffffffff);
-	perf_event_update_userpage(event);
-
-	return ret;
 #endif
 	local64_set(&hwc->prev_count, (u64)-left);
 
@@ -1379,7 +1374,7 @@ static void armv8pmu_stop(void)
 }
 
 static int armv8pmu_get_event_idx(struct pmu_hw_events *cpuc,
-				struct hw_perf_event *event)
+				  struct hw_perf_event *event)
 {
 	int idx;
 	unsigned long evtype = event->config_base & ARMV8_EVTYPE_EVENT;
@@ -1535,7 +1530,7 @@ static int armpmu_device_probe(struct platform_device *pdev)
 	/* Don't bother with PPIs; they're already affine */
 	irq = platform_get_irq(pdev, 0);
 	if (irq >= 0 && irq_is_percpu(irq))
-		goto out;
+                goto out;
 
 	irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
 	if (!irqs)
@@ -1571,7 +1566,6 @@ static int armpmu_device_probe(struct platform_device *pdev)
 		cpu_pmu->irq_affinity = irqs;
 	else
 		kfree(irqs);
-
 out:
 	cpu_pmu->plat_device = pdev;
 	return 0;
