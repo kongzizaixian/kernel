@@ -218,6 +218,16 @@ static unsigned int hi655x_regulator_pmic_get_optimum_mode(struct regulator_dev 
 	return REGULATOR_MODE_NORMAL;
 }
 
+static hi655x_set_current_limit(struct regulator_dev *rdev)
+{
+	return 0;
+}
+
+static hi655x_get_current_limit(struct regulator_dev *rdev)
+{
+	return 0;
+}
+
 static struct regulator_ops hi655x_regulator_pmic_rops = {
 	.is_enabled = hi655x_regulator_pmic_is_enabled,
 	.enable = hi655x_regulator_pmic_enable,
@@ -228,6 +238,8 @@ static struct regulator_ops hi655x_regulator_pmic_rops = {
 	.get_mode = hi655x_regulator_pmic_get_mode,
 	.set_mode = hi655x_regulator_pmic_set_mode,
 	.get_optimum_mode = hi655x_regulator_pmic_get_optimum_mode,
+	.set_current_limit = hi655x_set_current_limit,
+	.get_current_limit = hi655x_get_current_limit,
 };
 
 static int hi655x_regualtor_dt_parse_common(struct hi655x_regulator *sreg,
@@ -447,6 +459,7 @@ static int hi655x_regulator_probe(struct platform_device *pdev)
 	rdesc = &sreg->rdesc;
 	rdesc->n_voltages = sreg->vol_numb;
 	rdesc->name = initdata->constraints.name;
+	pr_err("probe of regulator name %s\n", rdesc->name);
 	rdesc->id = sreg->regulator_id;
 	rdesc->min_uV = initdata->constraints.min_uV;
 

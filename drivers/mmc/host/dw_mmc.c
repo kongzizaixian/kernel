@@ -3025,7 +3025,7 @@ EXPORT_SYMBOL(dw_mci_resume);
 
 static int __init dw_mci_init(void)
 {
-	pr_info("Synopsys Designware Multimedia Card Interface Driver\n");
+	pr_err("Synopsys Designware Multimedia Card Interface Driver\n");
 	return 0;
 }
 

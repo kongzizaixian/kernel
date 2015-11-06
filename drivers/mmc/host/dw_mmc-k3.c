@@ -34,13 +34,14 @@ static const struct dw_mci_drv_data k3_drv_data = {
 };
 
 static const struct of_device_id dw_mci_k3_match[] = {
-	{ .compatible = "hisilicon,hi4511-dw-mshc", .data = &k3_drv_data, },
+	{ .compatible = "hisilicon,hisi-dw-mshc", .data = &k3_drv_data, },
 	{},
 };
 MODULE_DEVICE_TABLE(of, dw_mci_k3_match);
 
 static int dw_mci_k3_probe(struct platform_device *pdev)
 {
+	printk(KERN_ERR "puck %s %d \n",__func__,__LINE__);
 	const struct dw_mci_drv_data *drv_data;
 	const struct of_device_id *match;
 
