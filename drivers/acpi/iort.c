@@ -34,7 +34,6 @@ typedef acpi_status (*iort_find_node_callback)
 /* Root pointer to the mapped IORT table */
 static struct acpi_table_header *iort_table;
 
-<<<<<<< HEAD
 static LIST_HEAD(iort_msi_chip_list);
 static DEFINE_SPINLOCK(iort_msi_chip_lock);
 
@@ -108,8 +107,6 @@ struct fwnode_handle *iort_find_domain_token(int trans_id)
 	return fw_node;
 }
 
-=======
->>>>>>> a6bc23d... {fromleg} ACPI: I/O Remapping Table (IORT) initial support
 static struct acpi_iort_node *
 iort_scan_node(enum acpi_iort_node_type type,
 	       iort_find_node_callback callback, void *context)
