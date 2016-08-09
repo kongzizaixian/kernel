@@ -58,8 +58,12 @@ static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
 
 	msi_info = msi_get_domain_info(domain->parent);
 
+<<<<<<< HEAD
 	ret = dev->of_node ? of_pmsi_get_dev_id(domain, dev, &dev_id) :
 		iort_pmsi_get_dev_id(dev, &dev_id);
+=======
+	ret = of_pmsi_get_dev_id(domain, dev, &dev_id);
+>>>>>>> 19cd733... {fromlist} irqchip: gicv3-its: platform-msi: refactor its_pmsi_prepare()
 	if (ret)
 		return ret;
 
