@@ -115,6 +115,7 @@ static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
 	return 0;
 }
 
+<<<<<<< HEAD
 #ifdef CONFIG_ACPI
 static int __init
 its_pmsi_parse_madt(struct acpi_subtable_header *header,
@@ -150,6 +151,8 @@ static void __init its_acpi_pmsi_init(void)
 static inline void its_acpi_pmsi_init(void) { }
 #endif
 
+=======
+>>>>>>> bccc6d2... {fromlist} irqchip: gicv3-its: platform-msi: refactor its_pmsi_init() to prepare for ACPI
 static void __init its_pmsi_of_init(void)
 {
 	struct device_node *np;
@@ -166,7 +169,10 @@ static void __init its_pmsi_of_init(void)
 static int __init its_pmsi_init(void)
 {
 	its_pmsi_of_init();
+<<<<<<< HEAD
 	its_acpi_pmsi_init();
+=======
+>>>>>>> bccc6d2... {fromlist} irqchip: gicv3-its: platform-msi: refactor its_pmsi_init() to prepare for ACPI
 	return 0;
 }
 early_initcall(its_pmsi_init);
