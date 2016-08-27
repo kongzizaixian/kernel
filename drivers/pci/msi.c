@@ -19,6 +19,7 @@
 #include <linux/smp.h>
 #include <linux/errno.h>
 #include <linux/io.h>
+#include <linux/iort.h>
 #include <linux/slab.h>
 #include <linux/irqdomain.h>
 #include <linux/of_irq.h>
@@ -1069,7 +1070,7 @@ static int __pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec,
 		nvec = maxvec;
 
 	for (;;) {
-		if (flags & PCI_IRQ_AFFINITY) {
+		if (!(flags & PCI_IRQ_NOAFFINITY)) {
 			dev->irq_affinity = irq_create_affinity_mask(&nvec);
 			if (nvec < minvec)
 				return -ENOSPC;
@@ -1105,7 +1106,7 @@ static int __pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec,
  **/
 int pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec)
 {
-	return __pci_enable_msi_range(dev, minvec, maxvec, 0);
+	return __pci_enable_msi_range(dev, minvec, maxvec, PCI_IRQ_NOAFFINITY);
 }
 EXPORT_SYMBOL(pci_enable_msi_range);
 
@@ -1120,7 +1121,7 @@ static int __pci_enable_msix_range(struct pci_dev *dev,
 		return -ERANGE;
 
 	for (;;) {
-		if (flags & PCI_IRQ_AFFINITY) {
+		if (!(flags & PCI_IRQ_NOAFFINITY)) {
 			dev->irq_affinity = irq_create_affinity_mask(&nvec);
 			if (nvec < minvec)
 				return -ENOSPC;
@@ -1160,7 +1161,8 @@ static int __pci_enable_msix_range(struct pci_dev *dev,
 int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
 		int minvec, int maxvec)
 {
-	return __pci_enable_msix_range(dev, entries, minvec, maxvec, 0);
+	return __pci_enable_msix_range(dev, entries, minvec, maxvec,
+			PCI_IRQ_NOAFFINITY);
 }
 EXPORT_SYMBOL(pci_enable_msix_range);
 
@@ -1186,25 +1188,22 @@ int pci_alloc_irq_vectors(struct pci_dev *dev, unsigned int min_vecs,
 {
 	int vecs = -ENOSPC;
 
-	if (flags & PCI_IRQ_MSIX) {
+	if (!(flags & PCI_IRQ_NOMSIX)) {
 		vecs = __pci_enable_msix_range(dev, NULL, min_vecs, max_vecs,
 				flags);
 		if (vecs > 0)
 			return vecs;
 	}
 
-	if (flags & PCI_IRQ_MSI) {
+	if (!(flags & PCI_IRQ_NOMSI)) {
 		vecs = __pci_enable_msi_range(dev, min_vecs, max_vecs, flags);
 		if (vecs > 0)
 			return vecs;
 	}
 
 	/* use legacy irq if allowed */
-	if ((flags & PCI_IRQ_LEGACY) && min_vecs == 1) {
-		pci_intx(dev, 1);
+	if (!(flags & PCI_IRQ_NOLEGACY) && min_vecs == 1)
 		return 1;
-	}
-
 	return vecs;
 }
 EXPORT_SYMBOL(pci_alloc_irq_vectors);
@@ -1502,8 +1501,8 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
 	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
 
 	of_node = irq_domain_get_of_node(domain);
-	if (of_node)
-		rid = of_msi_map_rid(&pdev->dev, of_node, rid);
+	rid = of_node ? of_msi_map_rid(&pdev->dev, of_node, rid) :
+			iort_msi_map_rid(&pdev->dev, rid);
 
 	return rid;
 }
@@ -1519,9 +1518,13 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
  */
 struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
 {
+	struct irq_domain *dom;
 	u32 rid = 0;
 
 	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
-	return of_msi_map_get_device_domain(&pdev->dev, rid);
+	dom = of_msi_map_get_device_domain(&pdev->dev, rid);
+	if (!dom)
+		dom = iort_get_device_domain(&pdev->dev, rid);
+	return dom;
 }
 #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
