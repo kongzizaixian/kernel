@@ -310,6 +310,33 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
 }
 
 /**
+ * iort_pmsi_get_dev_id() - Get the device id for a device
+ * @dev: The device for which the mapping is to be done.
+ * @dev_id: The device ID found.
+ *
+ * Returns: 0 for successful find a dev id, errors otherwise
+ */
+int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
+{
+	struct acpi_iort_node *node;
+
+	if (!iort_table)
+		return -ENODEV;
+
+	node = iort_find_dev_node(dev);
+	if (!node) {
+		dev_err(dev, "can't find related IORT node\n");
+		return -ENODEV;
+	}
+
+	/* For a platform device, we don't need a req_id */
+	if( !iort_node_map_rid(node, 0, dev_id, ACPI_IORT_NODE_ITS_GROUP))
+		return -ENODEV;
+
+	return 0;
+}
+
+/**
  * iort_dev_find_its_id() - Find the ITS identifier for a device
  * @dev: The device.
  * @idx: Index of the ITS identifier list.
@@ -360,6 +387,7 @@ iort_get_device_domain(struct device *dev, u32 req_id)
 {
 	static struct fwnode_handle *handle;
 	int its_id;
+	enum irq_domain_bus_token bus_token;
 
 	if (!iort_table)
 		return NULL;
@@ -371,7 +399,9 @@ iort_get_device_domain(struct device *dev, u32 req_id)
 	if (!handle)
 		return NULL;
 
-	return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
+	bus_token = dev_is_pci(dev) ?
+		    DOMAIN_BUS_PCI_MSI : DOMAIN_BUS_PLATFORM_MSI;
+	return irq_find_matching_fwnode(handle, bus_token);
 }
 
 void __init iort_table_detect(void)

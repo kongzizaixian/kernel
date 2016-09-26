@@ -16,7 +16,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <linux/acpi.h>
 #include <linux/interrupt.h>
 #include <linux/irqchip.h>
 #include <linux/module.h>
@@ -27,35 +26,27 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 
-/* Interrupt numbers per mbigen node supported */
-#define IRQS_PER_MBIGEN_NODE		128
-
-/* 64 irqs (Pin0-pin63) are reserved for each mbigen chip */
-#define RESERVED_IRQ_PER_MBIGEN_CHIP	64
-
 /* The maximum IRQ pin number of mbigen chip(start from 0) */
-#define MAXIMUM_IRQ_PIN_NUM		1407
+#define MAXIMUM_IRQ_PIN_NUM		640
 
 /**
  * In mbigen vector register
- * bit[21:12]:	event id value
- * bit[11:0]:	device id
+ * bit[31:16]:	device id
+ * bit[15:0]:	event id value
  */
-#define IRQ_EVENT_ID_SHIFT		12
-#define IRQ_EVENT_ID_MASK		0x3ff
-
-/* register range of each mbigen node */
-#define MBIGEN_NODE_OFFSET		0x1000
+#define IRQ_DEVICE_ID_SHIFT		16
+#define IRQ_EVENT_ID_MASK		0xffff
 
 /* offset of vector register in mbigen node */
-#define REG_MBIGEN_VEC_OFFSET		0x200
+#define REG_MBIGEN_VEC_OFFSET		0x300
+#define REG_MBIGEN_EXT_VEC_OFFSET		0x320
 
 /**
  * offset of clear register in mbigen node
  * This register is used to clear the status
  * of interrupt
  */
-#define REG_MBIGEN_CLEAR_OFFSET		0xa000
+#define REG_MBIGEN_CLEAR_OFFSET		0x100
 
 /**
  * offset of interrupt type register
@@ -69,38 +60,55 @@
  *
  * @pdev:		pointer to the platform device structure of mbigen chip.
  * @base:		mapped address of this mbigen chip.
+ * @dev_id:		device id of this mbigen device.
  */
 struct mbigen_device {
 	struct platform_device	*pdev;
 	void __iomem		*base;
+	unsigned int		dev_id;
 };
+
+/**
+ * define the event ID start value of each mbigen node
+ * in a mbigen chip
+ */
+static int mbigen_event_base[6] = {0, 64, 128, 192, 256, 384};
+
+static int get_mbigen_nid(unsigned int offset)
+{
+	int nid = 0;
+
+	if (offset < 256)
+		nid = offset / 64;
+	else if (offset < 384)
+		nid = 4;
+	else if (offset < 640)
+		nid = 5;
+
+	return nid;
+}
 
 static inline unsigned int get_mbigen_vec_reg(irq_hw_number_t hwirq)
 {
-	unsigned int nid, pin;
+	unsigned int nid;
 
-	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
-	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
-	pin = hwirq % IRQS_PER_MBIGEN_NODE;
+	nid = get_mbigen_nid(hwirq);
 
-	return pin * 4 + nid * MBIGEN_NODE_OFFSET
-			+ REG_MBIGEN_VEC_OFFSET;
+	if (nid < 4)
+		return (nid * 4) + REG_MBIGEN_VEC_OFFSET;
+	else
+		return (nid - 4) * 4 + REG_MBIGEN_EXT_VEC_OFFSET;
 }
 
 static inline void get_mbigen_type_reg(irq_hw_number_t hwirq,
 					u32 *mask, u32 *addr)
 {
-	unsigned int nid, irq_ofst, ofst;
+	int ofst;
 
-	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
-	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
-	irq_ofst = hwirq % IRQS_PER_MBIGEN_NODE;
+	ofst = hwirq / 32 * 4;
+	*mask = 1 << (hwirq % 32);
 
-	*mask = 1 << (irq_ofst % 32);
-	ofst = irq_ofst / 32 * 4;
-
-	*addr = ofst + nid * MBIGEN_NODE_OFFSET
-		+ REG_MBIGEN_TYPE_OFFSET;
+	*addr = ofst + REG_MBIGEN_TYPE_OFFSET;
 }
 
 static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
@@ -108,7 +116,6 @@ static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
 {
 	unsigned int ofst;
 
-	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
 	ofst = hwirq / 32 * 4;
 
 	*mask = 1 << (hwirq % 32);
@@ -150,7 +157,7 @@ static int mbigen_set_type(struct irq_data *data, unsigned int type)
 }
 
 static struct irq_chip mbigen_irq_chip = {
-	.name =			"mbigen-v2",
+	.name =			"mbigen-v1",
 	.irq_mask =		irq_chip_mask_parent,
 	.irq_unmask =		irq_chip_unmask_parent,
 	.irq_eoi =		mbigen_eoi_irq,
@@ -162,18 +169,20 @@ static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
 {
 	struct irq_data *d = irq_get_irq_data(desc->irq);
 	void __iomem *base = d->chip_data;
-	u32 val;
+	struct mbigen_device *mgn_chip;
+	u32 newval, oldval, nid;
+
+	mgn_chip = platform_msi_get_host_data(d->domain);
+
+	nid = get_mbigen_nid(d->hwirq);
 
 	base += get_mbigen_vec_reg(d->hwirq);
-	val = readl_relaxed(base);
 
-	val &= ~(IRQ_EVENT_ID_MASK << IRQ_EVENT_ID_SHIFT);
-	val |= (msg->data << IRQ_EVENT_ID_SHIFT);
+	newval = (mgn_chip->dev_id << IRQ_DEVICE_ID_SHIFT) | mbigen_event_base[nid];
+	oldval = readl_relaxed(base);
 
-	/* The address of doorbell is encoded in mbigen register by default
-	 * So,we don't need to program the doorbell address at here
-	 */
-	writel_relaxed(val, base);
+	if (newval != oldval)
+		writel_relaxed(newval, base);
 }
 
 static int mbigen_domain_translate(struct irq_domain *d,
@@ -181,15 +190,14 @@ static int mbigen_domain_translate(struct irq_domain *d,
 				    unsigned long *hwirq,
 				    unsigned int *type)
 {
-	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
+	if (is_of_node(fwspec->fwnode)) {
 		if (fwspec->param_count != 2)
 			return -EINVAL;
 
-		if ((fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM) ||
-			(fwspec->param[0] < RESERVED_IRQ_PER_MBIGEN_CHIP))
+		if (fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM)
 			return -EINVAL;
-		else
-			*hwirq = fwspec->param[0];
+
+		*hwirq = fwspec->param[0];
 
 		/* If there is no valid irq type, just use the default type */
 		if ((fwspec->param[1] == IRQ_TYPE_EDGE_RISING) ||
@@ -218,15 +226,20 @@ static int mbigen_irq_domain_alloc(struct irq_domain *domain,
 	if (err)
 		return err;
 
-	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
-	if (err)
-		return err;
 
 	mgn_chip = platform_msi_get_host_data(domain);
 
+	/* In order to carry hwirq information into parent
+	* domain alloc function, we set hwirq and chip info
+	* before platform_msi_domain_alloc is called
+	*/
 	for (i = 0; i < nr_irqs; i++)
 		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
 				      &mbigen_irq_chip, mgn_chip->base);
+
+	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
+	if (err)
+		return err;
 
 	return 0;
 }
@@ -237,94 +250,13 @@ static struct irq_domain_ops mbigen_domain_ops = {
 	.free		= irq_domain_free_irqs_common,
 };
 
-static int mbigen_of_create_domain(struct platform_device *pdev,
-				   struct mbigen_device *mgn_chip)
-{
-	struct device *parent;
-	struct platform_device *child;
-	struct irq_domain *domain;
-	struct device_node *np;
-	u32 num_pins;
-
-	for_each_child_of_node(pdev->dev.of_node, np) {
-		if (!of_property_read_bool(np, "interrupt-controller"))
-			continue;
-
-		parent = platform_bus_type.dev_root;
-		child = of_platform_device_create(np, NULL, parent);
-		if (!child)
-			return -ENOMEM;
-
-		if (of_property_read_u32(child->dev.of_node, "num-pins",
-					 &num_pins) < 0) {
-			dev_err(&pdev->dev, "No num-pins property\n");
-			return -EINVAL;
-		}
-
-		domain = platform_msi_create_device_domain(&child->dev, num_pins,
-							   mbigen_write_msg,
-							   &mbigen_domain_ops,
-							   mgn_chip);
-		if (!domain)
-			return -ENOMEM;
-	}
-
-	return 0;
-}
-
-#ifdef CONFIG_ACPI
-static acpi_status mbigen_acpi_process_resource(struct acpi_resource *ares,
-					     void *context)
-{
-	struct acpi_resource_extended_irq *ext_irq;
-	u32 *num_irqs = context;
-
-	switch (ares->type) {
-	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
-		ext_irq = &ares->data.extended_irq;
-		*num_irqs += ext_irq->interrupt_count;
-		break;
-	default:
-		break;
-	}
-
-	return AE_OK;
-}
-
-static int mbigen_acpi_create_domain(struct platform_device *pdev,
-				     struct mbigen_device *mgn_chip)
-{
-	struct irq_domain *domain;
-	u32 num_msis = 0;
-	acpi_status status;
-
-	status = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), METHOD_NAME__PRS,
-				     mbigen_acpi_process_resource, &num_msis);
-        if (ACPI_FAILURE(status) || num_msis == 0)
-		return -EINVAL;
-
-	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
-						   mbigen_write_msg,
-						   &mbigen_domain_ops,
-						   mgn_chip);
-	if (!domain)
-		return -ENOMEM;
-
-	return 0;
-}
-#else
-static int mbigen_acpi_create_domain(struct platform_device *pdev,
-				     struct mbigen_device *mgn_chip)
-{
-	return -ENODEV;
-}
-#endif
-
 static int mbigen_device_probe(struct platform_device *pdev)
 {
 	struct mbigen_device *mgn_chip;
 	struct resource *res;
-	int err;
+	struct irq_domain *domain;
+	u32 num_pins, dev_id;
+	int err = 0;
 
 	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
 	if (!mgn_chip)
@@ -333,53 +265,59 @@ static int mbigen_device_probe(struct platform_device *pdev)
 	mgn_chip->pdev = pdev;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	mgn_chip->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+	mgn_chip->base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(mgn_chip->base))
 		return PTR_ERR(mgn_chip->base);
 
-	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
-		err = mbigen_of_create_domain(pdev, mgn_chip);
-	else if (ACPI_COMPANION(&pdev->dev))
-		err = mbigen_acpi_create_domain(pdev, mgn_chip);
-	else
-		err = -EINVAL;
-
-	if (err) {
-		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain", mgn_chip->base);
-		return err;
+	if (of_property_read_u32(pdev->dev.of_node, "num-pins", &num_pins) < 0) {
+		dev_err(&pdev->dev, "No num-pins property\n");
+		return -EINVAL;
 	}
 
+	if (pdev->dev.of_node)
+		err = of_property_read_u32_index(pdev->dev.of_node, "msi-parent",
+						 1, &dev_id);
+
+	if (err)
+		return err;
+
+	mgn_chip->dev_id = dev_id;
+	domain = platform_msi_create_device_domain(&pdev->dev, num_pins,
+							mbigen_write_msg,
+							&mbigen_domain_ops,
+							mgn_chip);
+
+	if (!domain)
+		return -ENOMEM;
+
 	platform_set_drvdata(pdev, mgn_chip);
+
+	dev_info(&pdev->dev, "Allocated %d MSIs\n", num_pins);
+
 	return 0;
 }
 
 static const struct of_device_id mbigen_of_match[] = {
-	{ .compatible = "hisilicon,mbigen-v2" },
+	{ .compatible = "hisilicon,mbigen-v1" },
 	{ /* END */ }
 };
 MODULE_DEVICE_TABLE(of, mbigen_of_match);
 
-static const struct acpi_device_id mbigen_acpi_match[] = {
-        { "HISI0152", 0 },
-	{}
-};
-MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
-
 static struct platform_driver mbigen_platform_driver = {
 	.driver = {
-		.name		= "Hisilicon MBIGEN-V2",
+		.name		= "Hisilicon MBIGEN-V1",
+		.owner		= THIS_MODULE,
 		.of_match_table	= mbigen_of_match,
-		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
 	},
 	.probe			= mbigen_device_probe,
 };
 
-static __init int mbigen_init(void)
+static int __init mbigen_device_init(void)
 {
 	return platform_driver_register(&mbigen_platform_driver);
 }
+arch_initcall(mbigen_device_init)
 
-arch_initcall(mbigen_init);
 MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
 MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
 MODULE_LICENSE("GPL");
