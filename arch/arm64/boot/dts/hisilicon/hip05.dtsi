@@ -238,7 +238,6 @@
                 #size-cells = <2>;
                 ranges;
                 interrupt-controller;
-                timer-irqmap-disabled;
                 #redistributor-regions = <1>;
                 redistributor-stride = <0x0 0x30000>;
 		reg = <0x0 0x8d000000 0 0x10000>,	/* GICD */
@@ -391,6 +390,11 @@
 			status = "disabled";
 		};
 
+		lbc: localbus@80380000 {
+			compatible = "hisilicon,hisi-localbus", "simple-bus";
+			reg = <0x0 0x80380000 0x0 0x10000>;
+		};
+
 		m3_i2c0: i2c@a00e0000 {
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -495,7 +499,7 @@
 			#size-cells = <0>;
 			compatible = "hisilicon,hns-mdio";
 			reg = <0x0 0x803c0000 0x0 0x10000>;
-			subctrl-vbase = <&peri_c_subctrl>;
+			subctrl-vbase = <&peri_c_subctrl 0x338 0xa38 0x531c 0x5a1c>;
 
 			soc0_phy0: ethernet-phy@0 {
 				reg = <0x0>;
@@ -610,36 +614,40 @@
 
 			port@0 {
 				reg = <0>;
-				serdes-syscon = <&serdes_ctrl0>;
+				serdes-syscon = <&serdes_ctrl1>;
 				port-rst-offset = <0>;
 				port-mode-offset = <0>;
+				media-type = "fiber";
 			};
 
 			port@1 {
 				reg = <1>;
-				serdes-syscon = <&serdes_ctrl0>;
+				serdes-syscon = <&serdes_ctrl1>;
 				port-rst-offset = <1>;
 				port-mode-offset = <0>;
+				media-type = "fiber";
 			};
 
 			port@4 {
 				reg = <4>;
 				phy-handle = <&soc0_phy0>;
-				serdes-syscon = <&serdes_ctrl1>;
+				serdes-syscon = <&serdes_ctrl0>;
 				port-rst-offset = <4>;
 				port-mode-offset = <0>;
+				media-type = "copper";
 			};
 
 			port@5 {
 				reg = <5>;
 				phy-handle = <&soc0_phy1>;
-				serdes-syscon = <&serdes_ctrl1>;
+				serdes-syscon = <&serdes_ctrl0>;
 				port-rst-offset = <5>;
 				port-mode-offset = <0>;
+				media-type = "copper";
 			};
 		};
 
-		eth0: ethernet@5{
+		eth0: ethernet@0{
 			compatible = "hisilicon,hns-nic-v1";
 			ae-handle = <&dsaf0>;
 			port-idx-in-ae = <5>;
@@ -648,7 +656,7 @@
 			dma-coherent;
 		};
 
-		eth1: ethernet@4{
+		eth1: ethernet@1{
 			compatible = "hisilicon,hns-nic-v1";
 			ae-handle = <&dsaf0>;
 			port-idx-in-ae = <4>;
@@ -657,7 +665,7 @@
 			dma-coherent;
 		};
 
-		eth2: ethernet@0{
+		eth2: ethernet@2{
 			compatible = "hisilicon,hns-nic-v1";
 			ae-handle = <&dsaf0>;
 			port-idx-in-ae = <0>;
@@ -666,7 +674,7 @@
 			dma-coherent;
 		};
 
-		eth3: ethernet@1{
+		eth3: ethernet@3{
 			compatible = "hisilicon,hns-nic-v1";
 			ae-handle = <&dsaf0>;
 			port-idx-in-ae = <1>;
@@ -739,25 +747,6 @@
 					<376 4>,/* chip fatal error irq(120) */
 					<381 4>;/* chip fatal error irq(125) */
 			status = "disabled";
-		};
-
-		pc_sysctrl0: system-controller@0x80010000 {
-			compatible = "hisilicon,hip05-sysctrl", "syscon";
-			reg = <0x0 0x80010000 0x0 0x10000>;
-		};
-
-		djtag0: djtag {
-			compatible = "hisilicon,hip05-cpu-djtag-v1";
-			syscon = <&pc_sysctrl0>;
-		};
-
-		l3c0: l3c {
-			compatible = "hisilicon,hip05-l3c";
-			djtag = <&djtag0 2>;
-			interrupt-parent = <&mbigen_pc>;
-			interrupts = <141 4>,<142 4>,
-				<143 4>,<144 4>;
-			status = "okay";
 		};
 
 		pcie0: pcie@b0080000 {

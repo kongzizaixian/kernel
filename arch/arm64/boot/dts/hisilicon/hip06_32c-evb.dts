@@ -1,5 +1,5 @@
 /**
- * dts file for Hisilicon D03 Development Board
+ * dts file for Hisilicon EVB
  *
  * Copyright (C) 2016 Hisilicon Ltd.
  *
@@ -11,18 +11,21 @@
 
 /dts-v1/;
 
-#include "hip06.dtsi"
+/memreserve/ 0x00000000 0x00010000;
+/include/ "hip06-evb.dtsi"
 
 / {
-	model = "Hisilicon Hip06 D03 Development Board";
-	compatible = "hisilicon,hip06-d03";
+	model = "Hisilicon Hip06 Evaluation Board";
+	compatible = "hisilicon,hip06-evb";
 
 	memory@00000000 {
 		device_type = "memory";
-		reg = <0x0 0x00000000 0x0 0x40000000>;
+		reg = <0x0 0x00000000 0x0 0x3c000000>;
+	};
+	chosen {
+		bootargs = "console=ttyS0,115200 earlycon=uart8250,mmio32,0x60300000 initrd=0x7000000,500M";
 	};
 
-	chosen { };
 };
 
 &eth0 {
@@ -38,6 +41,22 @@
 };
 
 &eth3 {
+	status = "ok";
+};
+
+&eth4 {
+	status = "ok";
+};
+
+&eth5 {
+	status = "ok";
+};
+
+&eth6 {
+	status = "ok";
+};
+
+&eth7 {
 	status = "ok";
 };
 
