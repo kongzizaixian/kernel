@@ -145,10 +145,6 @@ static int __init its_pci_of_msi_init(void)
 	return 0;
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 42ba325... {fromleg} irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI domain initialization
 #ifdef CONFIG_ACPI
 
 static int __init
@@ -191,22 +187,10 @@ static int __init its_pci_acpi_msi_init(void)
 }
 #endif
 
-<<<<<<< HEAD
 static int __init its_pci_msi_init(void)
 {
 	its_pci_of_msi_init();
 	its_pci_acpi_msi_init();
-=======
-static int __init its_pci_msi_init(void)
-{
-	its_pci_of_msi_init();
->>>>>>> b5c02c2... {fromleg} irqchip/gicv3-its: Factor out code that might be reused for ACPI
-=======
-static int __init its_pci_msi_init(void)
-{
-	its_pci_of_msi_init();
-	its_pci_acpi_msi_init();
->>>>>>> 42ba325... {fromleg} irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI domain initialization
 
 	return 0;
 }

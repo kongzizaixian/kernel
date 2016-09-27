@@ -58,17 +58,8 @@ static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
 
 	msi_info = msi_get_domain_info(domain->parent);
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 	ret = dev->of_node ? of_pmsi_get_dev_id(domain, dev, &dev_id) :
 		iort_pmsi_get_dev_id(dev, &dev_id);
-=======
-	ret = of_pmsi_get_dev_id(domain, dev, &dev_id);
->>>>>>> 19cd733... {fromlist} irqchip: gicv3-its: platform-msi: refactor its_pmsi_prepare()
-=======
-	ret = dev->of_node ? of_pmsi_get_dev_id(domain, dev, &dev_id) :
-		iort_pmsi_get_dev_id(dev, &dev_id);
->>>>>>> c50541d... {fromlist} ACPI: platform-msi: retrieve dev id from IORT
 	if (ret)
 		return ret;
 
@@ -115,10 +106,6 @@ static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
 	return 0;
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> d0d6546... {fromlist} irqchip: gicv3-its: platform-msi: scan MADT to create platform msi domain
 #ifdef CONFIG_ACPI
 static int __init
 its_pmsi_parse_madt(struct acpi_subtable_header *header,
@@ -154,11 +141,6 @@ static void __init its_acpi_pmsi_init(void)
 static inline void its_acpi_pmsi_init(void) { }
 #endif
 
-<<<<<<< HEAD
-=======
->>>>>>> bccc6d2... {fromlist} irqchip: gicv3-its: platform-msi: refactor its_pmsi_init() to prepare for ACPI
-=======
->>>>>>> d0d6546... {fromlist} irqchip: gicv3-its: platform-msi: scan MADT to create platform msi domain
 static void __init its_pmsi_of_init(void)
 {
 	struct device_node *np;
@@ -175,14 +157,7 @@ static void __init its_pmsi_of_init(void)
 static int __init its_pmsi_init(void)
 {
 	its_pmsi_of_init();
-<<<<<<< HEAD
-<<<<<<< HEAD
 	its_acpi_pmsi_init();
-=======
->>>>>>> bccc6d2... {fromlist} irqchip: gicv3-its: platform-msi: refactor its_pmsi_init() to prepare for ACPI
-=======
-	its_acpi_pmsi_init();
->>>>>>> d0d6546... {fromlist} irqchip: gicv3-its: platform-msi: scan MADT to create platform msi domain
 	return 0;
 }
 early_initcall(its_pmsi_init);
