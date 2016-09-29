@@ -100,6 +100,10 @@ A convenient short-hand (PCI_IRQ_ALL_TYPES) is also available to ask for
 any possible kind of interrupt.  If the PCI_IRQ_AFFINITY flag is set,
 pci_alloc_irq_vectors() will spread the interrupts around the available CPUs.
 
+By default this function will spread the interrupts around the available
+CPUs, but this feature can be disabled by passing the PCI_IRQ_NOAFFINITY
+flag.
+
 To get the Linux IRQ numbers passed to request_irq() and free_irq() and the
 vectors, use the following function:
 

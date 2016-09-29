@@ -89,6 +89,13 @@ struct hisi_sas_port {
 
 struct hisi_sas_cq {
 	struct hisi_hba *hisi_hba;
+	int	rd_point;
+	int	id;
+};
+
+struct hisi_sas_dq {
+	struct hisi_hba *hisi_hba;
+	int	wr_point;
 	int	id;
 };
 
@@ -121,6 +128,10 @@ struct hisi_sas_slot {
 	dma_addr_t command_table_dma;
 	struct hisi_sas_sge_page *sge_page;
 	dma_addr_t sge_page_dma;
+#ifdef SAS_DIF
+	struct hisi_sas_sge_page *sge_dif_page;
+	dma_addr_t sge_dif_page_dma;
+#endif
 	struct work_struct abort_slot;
 };
 
@@ -146,6 +157,9 @@ struct hisi_sas_hw {
 			struct hisi_sas_slot *slot);
 	int (*prep_stp)(struct hisi_hba *hisi_hba,
 			struct hisi_sas_slot *slot);
+	int (*prep_abort)(struct hisi_hba *hisi_hba,
+			struct hisi_sas_slot *slot,
+			int device_id, int abort_flag, int tag_to_abort);
 	int (*slot_complete)(struct hisi_hba *hisi_hba,
 			     struct hisi_sas_slot *slot, int abort);
 	void (*phy_enable)(struct hisi_hba *hisi_hba, int phy_no);
@@ -156,6 +170,9 @@ struct hisi_sas_hw {
 	int (*get_wideport_bitmap)(struct hisi_hba *hisi_hba, int port_id);
 	int max_command_entries;
 	int complete_hdr_size;
+#ifdef SAS_DIF
+	u32 prot_cap;
+#endif
 };
 
 struct hisi_hba {
@@ -185,6 +202,7 @@ struct hisi_hba {
 	struct Scsi_Host *shost;
 
 	struct hisi_sas_cq cq[HISI_SAS_MAX_QUEUES];
+	struct hisi_sas_dq dq[HISI_SAS_MAX_QUEUES];
 	struct hisi_sas_phy phy[HISI_SAS_MAX_PHYS];
 	struct hisi_sas_port port[HISI_SAS_MAX_PHYS];
 
@@ -193,6 +211,9 @@ struct hisi_hba {
 	struct hisi_sas_slot	*slot_prep;
 
 	struct dma_pool *sge_page_pool;
+#ifdef SAS_DIF
+	struct dma_pool *sge_dif_page_pool;
+#endif
 	struct hisi_sas_device	devices[HISI_SAS_MAX_DEVICES];
 	struct dma_pool *command_table_pool;
 	struct dma_pool *status_buffer_pool;

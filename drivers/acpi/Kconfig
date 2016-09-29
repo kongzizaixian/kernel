@@ -57,6 +57,9 @@ config ACPI_SYSTEM_POWER_STATES_SUPPORT
 config ACPI_CCA_REQUIRED
 	bool
 
+config IORT_TABLE
+	bool
+
 config ACPI_DEBUGGER
 	bool "AML debugger interface"
 	select ACPI_DEBUG
@@ -76,6 +79,9 @@ config ACPI_DEBUGGER_USER
 	  to access the debugger functionalities.
 
 endif
+
+config ACPI_SPCR_TABLE
+	bool
 
 config ACPI_SLEEP
 	bool
@@ -520,5 +526,10 @@ config ACPI_CONFIGFS
 	  Select this option to enable support for ACPI configuration from
 	  userspace. The configurable ACPI groups will be visible under
 	  /config/acpi, assuming configfs is mounted under /config.
+
+if ARM64
+source "drivers/acpi/arm64/Kconfig"
+
+endif
 
 endif	# ACPI

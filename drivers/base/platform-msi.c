@@ -19,6 +19,7 @@
 
 #include <linux/device.h>
 #include <linux/idr.h>
+#include <linux/iort.h>
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
 #include <linux/msi.h>
@@ -338,16 +339,17 @@ platform_msi_create_device_domain(struct device *dev,
 {
 	struct platform_msi_priv_data *data;
 	struct irq_domain *domain;
+	struct fwnode_handle *fwnode;
 	int err;
 
 	data = platform_msi_alloc_priv_data(dev, nvec, write_msi_msg);
 	if (IS_ERR(data))
 		return NULL;
 
+	fwnode = dev->of_node ? &dev->of_node->fwnode : dev->fwnode;
 	data->host_data = host_data;
 	domain = irq_domain_create_hierarchy(dev->msi_domain, 0, nvec,
-					     of_node_to_fwnode(dev->of_node),
-					     ops, data);
+					     fwnode, ops, data);
 	if (!domain)
 		goto free_priv;
 
@@ -415,4 +417,17 @@ int platform_msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
 		platform_msi_domain_free(domain, virq, nr_irqs);
 
 	return err;
+}
+
+int acpi_configure_msi_domain(struct device *dev)
+{
+	struct irq_domain *d = NULL;
+
+	d = iort_get_device_domain(dev, 0);
+	if (d) {
+		dev_set_msi_domain(dev, d);
+		return 0;
+	}
+
+	return -EINVAL;
 }

@@ -49,16 +49,25 @@ struct redist_region {
 
 struct gic_chip_data {
 	struct fwnode_handle	*fwnode;
+	struct list_head	entry;
+	unsigned int		sid;
 	void __iomem		*dist_base;
 	struct redist_region	*redist_regions;
 	struct rdists		rdists;
 	struct irq_domain	*domain;
 	u64			redist_stride;
 	u32			nr_redist_regions;
-	unsigned int		irq_nr;
+	unsigned int		irq_nr;/* holds the total interrupts number of all GICs */
+	unsigned int		irq_nr_per_gic;/* holds the irq_nr of current gic node */
 	struct partition_desc	*ppi_descs[16];
 };
 
+static LIST_HEAD(gic_nodes);
+static DEFINE_SPINLOCK(gic_lock);
+static bool main_gic_init = false;
+static unsigned int gic_num = 0;
+
+/* presents the main gic node */
 static struct gic_chip_data gic_data __read_mostly;
 static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
 
@@ -81,13 +90,42 @@ static inline int gic_irq_in_rdist(struct irq_data *d)
 	return gic_irq(d) < 32;
 }
 
+struct gic_chip_data *gic_from_hwirq(struct irq_data *d)
+{
+	struct gic_chip_data *gic = NULL, *tmp;
+
+	/* if only one gic in system, just return the main gic*/
+	if(gic_num == 1)
+		return &gic_data;
+
+	spin_lock(&gic_lock);
+
+	list_for_each_entry(tmp, &gic_nodes, entry) {
+		if (tmp->sid == d->hwirq / tmp->irq_nr_per_gic) {
+			gic = tmp;
+			break;
+		}
+	}
+
+	spin_unlock(&gic_lock);
+
+	return gic;
+}
+
+static inline void __iomem *get_dist_base(struct irq_data *d)
+{
+	struct gic_chip_data *gic = gic_from_hwirq(d);
+
+	return WARN_ON(!gic) ? NULL : gic->dist_base;
+}
+
 static inline void __iomem *gic_dist_base(struct irq_data *d)
 {
 	if (gic_irq_in_rdist(d))	/* SGI+PPI -> SGI_base for this CPU */
 		return gic_data_rdist_sgi_base();
 
 	if (d->hwirq <= 1023)		/* SPI -> dist_base */
-		return gic_data.dist_base;
+		return get_dist_base(d);
 
 	return NULL;
 }
@@ -108,13 +146,13 @@ static void gic_do_wait_for_rwp(void __iomem *base)
 }
 
 /* Wait for completion of a distributor change */
-static void gic_dist_wait_for_rwp(void)
+static void gic_dist_wait_for_rwp(void __iomem *base)
 {
-	gic_do_wait_for_rwp(gic_data.dist_base);
+	gic_do_wait_for_rwp(base);
 }
 
 /* Wait for completion of a redistributor change */
-static void gic_redist_wait_for_rwp(void)
+static void gic_redist_wait_for_rwp(void __iomem *base)
 {
 	gic_do_wait_for_rwp(gic_data_rdist_rd_base());
 }
@@ -176,7 +214,7 @@ static int gic_peek_irq(struct irq_data *d, u32 offset)
 	if (gic_irq_in_rdist(d))
 		base = gic_data_rdist_sgi_base();
 	else
-		base = gic_data.dist_base;
+		base = get_dist_base(d);
 
 	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
 }
@@ -184,19 +222,19 @@ static int gic_peek_irq(struct irq_data *d, u32 offset)
 static void gic_poke_irq(struct irq_data *d, u32 offset)
 {
 	u32 mask = 1 << (gic_irq(d) % 32);
-	void (*rwp_wait)(void);
+	void (*rwp_wait)(void __iomem *base);
 	void __iomem *base;
 
 	if (gic_irq_in_rdist(d)) {
 		base = gic_data_rdist_sgi_base();
 		rwp_wait = gic_redist_wait_for_rwp;
 	} else {
-		base = gic_data.dist_base;
+		base = get_dist_base(d);
 		rwp_wait = gic_dist_wait_for_rwp;
 	}
 
 	writel_relaxed(mask, base + offset + (gic_irq(d) / 32) * 4);
-	rwp_wait();
+	rwp_wait(base);
 }
 
 static void gic_mask_irq(struct irq_data *d)
@@ -298,7 +336,7 @@ static void gic_eoimode1_eoi_irq(struct irq_data *d)
 static int gic_set_type(struct irq_data *d, unsigned int type)
 {
 	unsigned int irq = gic_irq(d);
-	void (*rwp_wait)(void);
+	void (*rwp_wait)(void __iomem *base);
 	void __iomem *base;
 
 	/* Interrupt configuration for SGIs can't be changed */
@@ -314,7 +352,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 		base = gic_data_rdist_sgi_base();
 		rwp_wait = gic_redist_wait_for_rwp;
 	} else {
-		base = gic_data.dist_base;
+		base = get_dist_base(d);
 		rwp_wait = gic_dist_wait_for_rwp;
 	}
 
@@ -396,7 +434,7 @@ static void __init gic_dist_init(void)
 
 	/* Disable the distributor */
 	writel_relaxed(0, base + GICD_CTLR);
-	gic_dist_wait_for_rwp();
+	gic_dist_wait_for_rwp(base);
 
 	/*
 	 * Configure SPIs as non-secure Group-1. This will only matter
@@ -633,7 +671,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 			    bool force)
 {
 	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
-	void __iomem *reg;
+	void __iomem *reg, *base = get_dist_base(d);
 	int enabled;
 	u64 val;
 
@@ -657,7 +695,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 	if (enabled)
 		gic_unmask_irq(d);
 	else
-		gic_dist_wait_for_rwp();
+		gic_dist_wait_for_rwp(base);
 
 	return IRQ_SET_MASK_OK_DONE;
 }
@@ -667,20 +705,13 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 #endif
 
 #ifdef CONFIG_CPU_PM
-/* Check whether it's single security state view */
-static bool gic_dist_security_disabled(void)
-{
-	return readl_relaxed(gic_data.dist_base + GICD_CTLR) & GICD_CTLR_DS;
-}
-
 static int gic_cpu_pm_notifier(struct notifier_block *self,
 			       unsigned long cmd, void *v)
 {
 	if (cmd == CPU_PM_EXIT) {
-		if (gic_dist_security_disabled())
-			gic_enable_redist(true);
+		gic_enable_redist(true);
 		gic_cpu_sys_reg_init();
-	} else if (cmd == CPU_PM_ENTER && gic_dist_security_disabled()) {
+	} else if (cmd == CPU_PM_ENTER) {
 		gic_write_grpen1(0);
 		gic_enable_redist(false);
 	}
@@ -910,7 +941,6 @@ static int __init gic_init_bases(void __iomem *dist_base,
 				 u64 redist_stride,
 				 struct fwnode_handle *handle)
 {
-	struct device_node *node;
 	u32 typer;
 	int gic_irqs;
 	int err;
@@ -951,10 +981,8 @@ static int __init gic_init_bases(void __iomem *dist_base,
 
 	set_handle_irq(gic_handle_irq);
 
-	node = to_of_node(handle);
-	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis() &&
-	    node) /* Temp hack to prevent ITS init for ACPI */
-		its_init(node, &gic_data.rdists, gic_data.domain);
+	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+		its_init(handle, &gic_data.rdists, gic_data.domain);
 
 	gic_smp_init();
 	gic_dist_init();
@@ -1093,6 +1121,58 @@ static void __init gic_populate_ppi_partitions(struct device_node *gic_node)
 	}
 }
 
+/* just a copy of gic_dist_init() */
+static void __init auxiliary_gic_dist_init(void __iomem *base)
+{
+	unsigned int i;
+	u64 affinity;
+
+	/* Disable the distributor */
+	writel_relaxed(0, base + GICD_CTLR);
+	gic_dist_wait_for_rwp(base);
+
+	gic_dist_config(base, gic_data.irq_nr, gic_dist_wait_for_rwp);
+
+	/* Enable distributor with ARE, Group1 */
+	writel_relaxed(GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1,
+		       base + GICD_CTLR);
+
+	/*
+	 * Set all global interrupts to the boot CPU only. ARE must be
+	 * enabled.
+	 */
+	affinity = gic_mpidr_to_affinity(cpu_logical_map(smp_processor_id()));
+	for (i = 32; i < gic_data.irq_nr; i++)
+		gic_write_irouter(affinity, base + GICD_IROUTER + i * 8);
+}
+
+static int auxiliary_gic_init(void __iomem *dist_base)
+{
+	struct gic_chip_data *gic_data_aux;
+	u32 reg;
+
+	gic_data_aux = kzalloc(sizeof(*gic_data_aux), GFP_KERNEL);
+	if (!gic_data_aux)
+		return -ENOMEM;
+
+	reg = readl_relaxed(dist_base + GICD_SIDR);
+	gic_data_aux->sid = reg & GIC_SID_MASK;
+
+	/* assume the aux-gic has same interrupt number as main gic */
+	gic_data_aux->irq_nr_per_gic = gic_data.irq_nr_per_gic;
+	
+	/* go to initial dist */
+	auxiliary_gic_dist_init(dist_base);
+
+	spin_lock(&gic_lock);
+	list_add(&gic_data_aux->entry, &gic_nodes);
+	spin_unlock(&gic_lock);
+
+	gic_num ++;
+
+	return 0;
+}
+
 static void __init gic_of_setup_kvm_info(struct device_node *node)
 {
 	int ret;
@@ -1123,6 +1203,7 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
 	struct redist_region *rdist_regs;
 	u64 redist_stride;
 	u32 nr_redist_regions;
+	u32 reg;
 	int err, i;
 
 	dist_base = of_iomap(node, 0);
@@ -1137,6 +1218,11 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
 		pr_err("%s: no distributor detected, giving up\n",
 			node->full_name);
 		goto out_unmap_dist;
+	}
+
+	if (main_gic_init) {
+		auxiliary_gic_init(dist_base);
+		return 0;
 	}
 
 	if (of_property_read_u32(node, "#redistributor-regions", &nr_redist_regions))
@@ -1166,6 +1252,18 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
 	if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
 		redist_stride = 0;
 
+	/*
+	 * For Hisilicon SOC(p660, Hi1610 etc.), the default irq number
+	 * is 128.
+	 * To find the gic in system with multi-gic, record the sid
+	 * information.(only hisilicon soc has this register)
+	 */
+	if (of_device_is_compatible(node, "hisilicon,gic-v3")) {
+		reg = readl_relaxed(dist_base + GICD_SIDR);
+		gic_data.sid = reg & GIC_SID_MASK;
+		gic_data.irq_nr_per_gic = 0x80;
+	}
+
 	err = gic_init_bases(dist_base, rdist_regs, nr_redist_regions,
 			     redist_stride, &node->fwnode);
 	if (err)
@@ -1173,6 +1271,15 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
 
 	gic_populate_ppi_partitions(node);
 	gic_of_setup_kvm_info(node);
+	if (gic_num) {
+		pr_err("gic_num should be 0 not %d\n", gic_num);
+		goto out_unmap_rdist;
+	}
+	gic_num++;
+	spin_lock(&gic_lock);
+	list_add(&gic_data.entry, &gic_nodes);
+	spin_unlock(&gic_lock);
+	main_gic_init = true;
 	return 0;
 
 out_unmap_rdist:
@@ -1186,6 +1293,7 @@ out_unmap_dist:
 }
 
 IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
+IRQCHIP_DECLARE(hic_v3, "hisilicon,gic-v3", gic_of_init);
 
 #ifdef CONFIG_ACPI
 static struct
@@ -1461,6 +1569,8 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
 
 	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
 	gic_acpi_setup_kvm_info();
+
+	gic_num++;
 
 	return 0;
 
