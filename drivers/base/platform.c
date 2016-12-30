@@ -537,9 +537,6 @@ struct platform_device *platform_device_register_full(
 			goto err;
 	}
 
-	if (pdevinfo->pre_add_cb)
-		pdevinfo->pre_add_cb(&pdev->dev);
-
 	ret = platform_device_add(pdev);
 	if (ret) {
 err:
