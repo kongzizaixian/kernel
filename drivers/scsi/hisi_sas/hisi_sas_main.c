@@ -183,6 +183,7 @@ static int hisi_sas_task_prep(struct sas_task *task, struct hisi_hba *hisi_hba,
 	struct asd_sas_port *sas_port = device->port;
 	struct device *dev = &hisi_hba->pdev->dev;
 	int dlvry_queue_slot, dlvry_queue, n_elem = 0, rc, slot_idx;
+	unsigned long flags;
 
 	if (!sas_port) {
 		struct task_status_struct *ts = &task->task_status;
@@ -303,9 +304,9 @@ static int hisi_sas_task_prep(struct sas_task *task, struct hisi_hba *hisi_hba,
 	}
 
 	list_add_tail(&slot->entry, &sas_dev->list);
-	spin_lock(&task->task_state_lock);
+	spin_lock_irqsave(&task->task_state_lock, flags);
 	task->task_state_flags |= SAS_TASK_AT_INITIATOR;
-	spin_unlock(&task->task_state_lock);
+	spin_unlock_irqrestore(&task->task_state_lock, flags);
 
 	hisi_hba->slot_prep = slot;
 
@@ -953,9 +954,7 @@ static int hisi_sas_abort_task(struct sas_task *task)
 		return TMF_RESP_FUNC_FAILED;
 	}
 
-	spin_lock_irqsave(&task->task_state_lock, flags);
 	if (task->task_state_flags & SAS_TASK_STATE_DONE) {
-		spin_unlock_irqrestore(&task->task_state_lock, flags);
 		rc = TMF_RESP_FUNC_COMPLETE;
 		goto out;
 	}
@@ -1165,6 +1164,7 @@ hisi_sas_internal_abort_task_exec(struct hisi_hba *hisi_hba, u64 device_id,
 	struct asd_sas_port *sas_port = device->port;
 	struct hisi_sas_cmd_hdr *cmd_hdr_base;
 	int dlvry_queue_slot, dlvry_queue, n_elem = 0, rc, slot_idx;
+	unsigned long flags;
 
 	if (unlikely(test_bit(HISI_SAS_RESET_BIT, &hisi_hba->flags)))
 		return -EINVAL;
@@ -1205,9 +1205,9 @@ hisi_sas_internal_abort_task_exec(struct hisi_hba *hisi_hba, u64 device_id,
 
 
 	list_add_tail(&slot->entry, &sas_dev->list);
-	spin_lock(&task->task_state_lock);
+	spin_lock_irqsave(&task->task_state_lock, flags);
 	task->task_state_flags |= SAS_TASK_AT_INITIATOR;
-	spin_unlock(&task->task_state_lock);
+	spin_unlock_irqrestore(&task->task_state_lock, flags);
 
 	hisi_hba->slot_prep = slot;
 
