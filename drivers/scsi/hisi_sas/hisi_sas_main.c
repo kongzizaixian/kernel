@@ -854,14 +854,14 @@ static int hisi_sas_softreset_ata_disk(struct domain_device *device)
 	int rc = TMF_RESP_FUNC_FAILED;
 	struct hisi_hba *hisi_hba = dev_to_hisi_hba(device);
 	struct device *dev = &hisi_hba->pdev->dev;
+	int s = sizeof(struct host_to_dev_fis);
 	unsigned long flags;
 
 	ata_for_each_link(link, ap, EDGE) {
 		int pmp = sata_srst_pmp(link);
 
 		hisi_sas_fill_ata_reset_cmd(link->device, 1, pmp, fis);
-		rc = hisi_sas_exec_internal_tmf_task(device,
-			fis, sizeof(struct host_to_dev_fis), NULL);
+		rc = hisi_sas_exec_internal_tmf_task(device, fis, s, NULL);
 		if (rc != TMF_RESP_FUNC_COMPLETE)
 			break;
 	}
@@ -871,8 +871,8 @@ static int hisi_sas_softreset_ata_disk(struct domain_device *device)
 			int pmp = sata_srst_pmp(link);
 
 			hisi_sas_fill_ata_reset_cmd(link->device, 0, pmp, fis);
-			rc = hisi_sas_exec_internal_tmf_task(device,
-				fis, sizeof(struct host_to_dev_fis), NULL);
+			rc = hisi_sas_exec_internal_tmf_task(device, fis,
+							     s, NULL);
 			if (rc != TMF_RESP_FUNC_COMPLETE)
 				dev_err(dev, "ata disk de-reset failed\n");
 		}
