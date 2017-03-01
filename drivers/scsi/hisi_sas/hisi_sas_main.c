@@ -995,14 +995,6 @@ static int hisi_sas_abort_task(struct sas_task *task)
 			hisi_sas_internal_task_abort(hisi_hba, device,
 						     HISI_SAS_INT_ABT_DEV, 0);
 			rc = hisi_sas_softreset_ata_disk(device);
-			/* Softreset failed, linkrset*/
-			if (rc != TMF_RESP_FUNC_COMPLETE)
-				rc = hisi_sas_I_T_nexus_reset(device);
-			if (rc != TMF_RESP_FUNC_COMPLETE) {
-				hisi_sas_controller_reset(hisi_hba);
-				hisi_sas_I_T_nexus_reset(device);
-			}
-			rc = TMF_RESP_FUNC_COMPLETE;
 		}
 	} else if (task->task_proto & SAS_PROTOCOL_SMP) {
 		/* SMP */
