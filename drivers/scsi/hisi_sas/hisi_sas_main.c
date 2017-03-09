@@ -959,7 +959,6 @@ static int hisi_sas_abort_task(struct sas_task *task)
 		goto out;
 	}
 
-	spin_unlock_irqrestore(&task->task_state_lock, flags);
 	sas_dev->dev_status = HISI_SAS_DEV_EH;
 	if (task->lldd_task && task->task_proto & SAS_PROTOCOL_SSP) {
 		struct scsi_cmnd *cmnd = task->uldd_task;
