@@ -2042,14 +2042,8 @@ slot_complete_v2_hw(struct hisi_hba *hisi_hba, struct hisi_sas_slot *slot)
 		else if (ERR_ON_RX_PHASE(err_phase))
 			slot_err_v2_hw(hisi_hba, task, slot, 2);
 
-		if (unlikely(slot->abort)) {
-			if (task->task_proto == SAS_PROTOCOL_SSP) {
-				queue_work(hisi_hba->wq, &slot->abort_slot);
-				/* immediately return and do not complete */
+		if (unlikely(slot->abort))
 				return ts->stat;
-			}
-			return -EINVAL;
-		}
 		goto out;
 	}
 
