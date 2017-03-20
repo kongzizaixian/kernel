@@ -242,6 +242,7 @@ struct hisi_hba {
 	unsigned long flags;
 	const struct hisi_sas_hw *hw;	/* Low level hw interface */
 	unsigned long sata_dev_bitmap[BITS_TO_LONGS(HISI_SAS_MAX_DEVICES)];
+	struct work_struct rst_work;
 };
 
 /* Generic HW DMA host memory structures */

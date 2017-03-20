@@ -1635,6 +1635,14 @@ static void hisi_sas_free(struct hisi_hba *hisi_hba)
 		destroy_workqueue(hisi_hba->wq);
 }
 
+static void hisi_sas_rst_work_handler(struct work_struct *work)
+{
+	struct hisi_hba *hisi_hba =
+		container_of(work, struct hisi_hba, rst_work);
+
+	hisi_sas_controller_reset(hisi_hba);
+}
+
 static struct Scsi_Host *hisi_sas_shost_alloc(struct platform_device *pdev,
 					      const struct hisi_sas_hw *hw)
 {
@@ -1652,6 +1660,7 @@ static struct Scsi_Host *hisi_sas_shost_alloc(struct platform_device *pdev,
 	}
 	hisi_hba = shost_priv(shost);
 
+	INIT_WORK(&hisi_hba->rst_work, hisi_sas_rst_work_handler);
 	hisi_hba->hw = hw;
 	hisi_hba->pdev = pdev;
 	hisi_hba->shost = shost;
