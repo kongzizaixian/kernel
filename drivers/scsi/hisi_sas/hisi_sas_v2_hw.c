@@ -3277,7 +3277,7 @@ static int soft_reset_v2_hw(struct hisi_hba *hisi_hba)
 	}
 
 	/* Wait for the PHYs to come up and read the PHY state */
-	msleep(100);
+	msleep(1000);
 
 	state = hisi_sas_read32(hisi_hba, PHY_STATE);
 
