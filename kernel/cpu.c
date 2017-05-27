@@ -27,6 +27,7 @@
 #include <linux/smpboot.h>
 #include <linux/relay.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 
 #include <trace/events/power.h>
 #define CREATE_TRACE_POINTS
@@ -95,6 +96,25 @@ struct cpuhp_step {
 static DEFINE_MUTEX(cpuhp_state_mutex);
 static struct cpuhp_step cpuhp_bp_states[];
 static struct cpuhp_step cpuhp_ap_states[];
+
+void dump_bp_states(const char *func, int line) {
+         int i;
+         phys_addr_t phys;
+
+         mdelay(50);
+
+          printk("|%-3s|%-20s|%-16s|%-16s|%-16s|%-4s|%4s|%-4s|","i","name","physaddr","startup","teardown","skip_onerr","cant_stop","multi_instance");
+          
+	for (i = CPUHP_OFFLINE; i <= CPUHP_TEARDOWN_CPU; i++)
+         {
+           phys = virt_to_phys((void *)&cpuhp_bp_states[i]);
+ printk(KERN_ERR "|%-3d|%-20s|%p|%p|%p|%d|%d|%d|\n", i,cpuhp_bp_states[i].name,(void *)phys,cpuhp_bp_states[i].startup.single, cpuhp_bp_states[i].teardown.single,cpuhp_bp_states[i].skip_onerr,cpuhp_bp_states[i].cant_stop,cpuhp_bp_states[i].multi_instance);
+          
+          mdelay(50);
+          }
+         /* attempt to eliminate timing differences across reboots */
+          mdelay(500);
+  }
 
 static bool cpuhp_is_ap_state(enum cpuhp_state state)
 {

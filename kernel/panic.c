@@ -99,6 +99,8 @@ void __weak crash_smp_send_stop(void)
 }
 
 atomic_t panic_cpu = ATOMIC_INIT(PANIC_CPU_INVALID);
+static int __dummy_test_array[692+11334+780+474+200+346] = { 1, 2, 3 };
+int *global_dummy_p;
 
 /*
  * A variant of panic() called from NMI context. We return if we've already
@@ -606,8 +608,14 @@ core_param(pause_on_oops, pause_on_oops, int, 0644);
 core_param(panic_on_warn, panic_on_warn, int, 0644);
 core_param(crash_kexec_post_notifiers, crash_kexec_post_notifiers, bool, 0644);
 
+void __dummy_void_ops(void)
+{
+	nops(11364);
+}
+
 static int __init oops_setup(char *s)
 {
+	global_dummy_p = __dummy_test_array;
 	if (!s)
 		return -EINVAL;
 	if (!strcmp(s, "panic"))

@@ -100,6 +100,7 @@ static int kernel_init(void *);
 extern void init_IRQ(void);
 extern void fork_init(void);
 extern void radix_tree_init(void);
+extern void dump_bp_states(const char *fund, int line);
 
 /*
  * Debug helper: via this flag we know that we are in 'early bootup code'
@@ -489,10 +490,11 @@ asmlinkage __visible void __init start_kernel(void)
 {
 	char *command_line;
 	char *after_dashes;
-
+	
 	set_task_stack_end_magic(&init_task);
 	smp_setup_processor_id();
 	debug_objects_early_init();
+dump_bp_states(__FUNCTION__, __LINE__);
 
 	/*
 	 * Set up the the initial canary ASAP:
