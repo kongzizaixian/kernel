@@ -1664,6 +1664,40 @@ static int hns3_pci_sriov_configure(struct pci_dev *pdev, int num_vfs)
 	return 0;
 }
 
+/**
+ * hns3_pci_sriov_configure
+ * @pdev: pointer to a pci_dev structure
+ * @num_vfs: number of VFs to allocate
+ *
+ * Enable or change the number of VFs. Called when the user updates the number
+ * of VFs in sysfs.
+ **/
+ /**
+static int hns3_pci_sriov_configure(struct pci_dev *pdev, int num_vfs)
+{
+	int ret;
+
+	if (!(hns3_is_phys_func(pdev) && IS_ENABLED(CONFIG_PCI_IOV))) {
+		dev_warn(&pdev->dev, "Can not config SRIOV\n");
+		return -EINVAL;
+	}
+
+	if (num_vfs) {
+		ret = pci_enable_sriov(pdev, num_vfs);
+		if (ret)
+			dev_err(&pdev->dev, "SRIOV enable failed %d\n", ret);
+		else
+			return num_vfs;
+	} else if (!pci_vfs_assigned(pdev)) {
+		pci_disable_sriov(pdev);
+	} else {
+		dev_warn(&pdev->dev,
+			 "Unable to free VFs because some are assigned to VMs.\n");
+	}
+
+	return 0;
+}
+*/
 static struct pci_driver hns3_driver = {
 	.name     = hns3_driver_name,
 	.id_table = hns3_pci_tbl,
