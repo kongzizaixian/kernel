@@ -3606,6 +3606,7 @@ static int hns3_client_init(struct hnae3_handle *handle)
 	priv->netdev = netdev;
 	priv->ae_handle = handle;
 	priv->tx_timeout_count = 0;
+	set_bit(HNS3_NIC_STATE_DOWN, &priv->state);
 
 	handle->kinfo.netdev = netdev;
 	handle->priv = (void *)priv;
