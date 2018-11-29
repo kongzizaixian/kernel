@@ -807,7 +807,7 @@ static int hns3_set_ringparam(struct net_device *ndev,
 		    new_tx_desc_num, new_rx_desc_num);
 
 	if (if_running)
-		dev_close(ndev);
+		ndev->netdev_ops->ndo_stop(ndev);
 
 	ret = hns3_uninit_all_ring(priv);
 	if (ret)
@@ -826,7 +826,7 @@ static int hns3_set_ringparam(struct net_device *ndev,
 	}
 
 	if (if_running)
-		ret = dev_open(ndev, NULL);
+		ret = ndev->netdev_ops->ndo_open(ndev);
 
 	return ret;
 }
